@@ -1,0 +1,59 @@
+name: AffirmAlarm
+options:
+  bundleIdPrefix: com.affirmalarm
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  SWIFT_VERSION: "5.0"
+targets:
+  AffirmAlarmCore:
+    type: framework
+    platform: iOS
+    sources: [Sources/AffirmAlarmCore]
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.affirmalarm.core
+  AffirmAlarmCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests/AffirmAlarmCoreTests]
+    dependencies:
+      - target: AffirmAlarmCore
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.affirmalarm.core.tests
+  AffirmAlarm:
+    type: application
+    platform: iOS
+    sources: [Sources/AffirmAlarm]
+    dependencies:
+      - target: AffirmAlarmCore
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.affirmalarm.app
+    info:
+      path: Sources/AffirmAlarm/Info.plist
+      properties:
+        UILaunchScreen: {}
+        NSMicrophoneUsageDescription: "AffirmAlarm needs your microphone to verify you've spoken your affirmation."
+        NSSpeechRecognitionUsageDescription: "AffirmAlarm uses on-device speech recognition to verify your affirmation."
+  AffirmAlarmUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests/AffirmAlarmUITests]
+    dependencies:
+      - target: AffirmAlarm
+schemes:
+  AffirmAlarmCore:
+    build:
+      targets:
+        AffirmAlarmCore: all
+    test:
+      targets:
+        - AffirmAlarmCoreTests
+  AffirmAlarm:
+    build:
+      targets:
+        AffirmAlarm: all
+    test:
+      targets:
+        - AffirmAlarmUITests
+    run:
+      config: Debug
