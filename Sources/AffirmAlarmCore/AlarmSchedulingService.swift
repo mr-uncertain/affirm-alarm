@@ -57,7 +57,7 @@ public final class AlarmKitSchedulingService: AlarmSchedulingService {
                 let relative = Alarm.Schedule.Relative(time: scheduleTime, repeats: .never)
                 let schedule = Alarm.Schedule.relative(relative)
 
-                let configuration = AlarmConfiguration(schedule: schedule, attributes: attributes)
+                let configuration = AlarmManager.AlarmConfiguration(schedule: schedule, attributes: attributes)
                 _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
             } catch {
                 // Best-effort: see comment above.
