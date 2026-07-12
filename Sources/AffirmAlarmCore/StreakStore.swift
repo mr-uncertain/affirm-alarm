@@ -26,10 +26,12 @@ final class AffirmationRecord {
     var id: UUID
     var text: String
     var isUserAuthored: Bool
-    init(id: UUID, text: String, isUserAuthored: Bool) {
+    var sortOrder: Int
+    init(id: UUID, text: String, isUserAuthored: Bool, sortOrder: Int) {
         self.id = id
         self.text = text
         self.isUserAuthored = isUserAuthored
+        self.sortOrder = sortOrder
     }
 }
 
@@ -80,15 +82,16 @@ public final class SwiftDataStreakStore: StreakStore {
     }
 
     public func loadAffirmations() -> [Affirmation] {
-        let records = (try? context.fetch(FetchDescriptor<AffirmationRecord>())) ?? []
+        let descriptor = FetchDescriptor<AffirmationRecord>(sortBy: [SortDescriptor(\.sortOrder)])
+        let records = (try? context.fetch(descriptor)) ?? []
         return records.map { Affirmation(id: $0.id, text: $0.text, isUserAuthored: $0.isUserAuthored) }
     }
 
     public func save(_ affirmations: [Affirmation]) {
         let existing = try? context.fetch(FetchDescriptor<AffirmationRecord>())
         existing?.forEach { context.delete($0) }
-        for a in affirmations {
-            context.insert(AffirmationRecord(id: a.id, text: a.text, isUserAuthored: a.isUserAuthored))
+        for (index, a) in affirmations.enumerated() {
+            context.insert(AffirmationRecord(id: a.id, text: a.text, isUserAuthored: a.isUserAuthored, sortOrder: index))
         }
         try? context.save()
     }

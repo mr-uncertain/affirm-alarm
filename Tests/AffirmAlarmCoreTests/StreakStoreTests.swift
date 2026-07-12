@@ -35,4 +35,15 @@ final class StreakStoreTests: XCTestCase {
         store.save(saved)
         XCTAssertEqual(store.loadAffirmations(), saved)
     }
+
+    func test_loadAffirmations_preservesSaveOrder() {
+        let store = SwiftDataStreakStore(inMemory: true)
+        let saved = [
+            Affirmation(text: "I am capable", isUserAuthored: true),
+            Affirmation(text: "I am strong", isUserAuthored: true),
+            Affirmation(text: "I am calm", isUserAuthored: true)
+        ]
+        store.save(saved)
+        XCTAssertEqual(store.loadAffirmations(), saved)
+    }
 }
