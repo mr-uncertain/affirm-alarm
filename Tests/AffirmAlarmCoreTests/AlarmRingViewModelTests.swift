@@ -70,6 +70,24 @@ final class AlarmRingViewModelTests: XCTestCase {
         XCTAssertEqual(vm.state, .listening(currentIndex: 0, currentRepeat: 0))
     }
 
+    func test_releaseHold_afterVerifyingOneAffirmation_preservesProgressOnResume() {
+        let (vm, speech, _, _) = makeViewModel(
+            affirmations: [
+                Affirmation(text: "I am capable", isUserAuthored: true),
+                Affirmation(text: "I am strong", isUserAuthored: true)
+            ],
+            streakDay: 14 // 2 affirmations x1 repeat each
+        )
+        vm.beginRing()
+        vm.startHolding()
+        speech.simulateTranscript("I am capable")
+        XCTAssertEqual(vm.state, .listening(currentIndex: 1, currentRepeat: 0))
+        vm.releaseHold()
+        XCTAssertEqual(vm.state, .idle)
+        vm.startHolding()
+        XCTAssertEqual(vm.state, .listening(currentIndex: 1, currentRepeat: 0))
+    }
+
     func test_startHolding_lowersAlarmVolume() {
         let (vm, _, alarm, _) = makeViewModel()
         vm.beginRing()
