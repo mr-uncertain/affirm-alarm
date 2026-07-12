@@ -95,6 +95,7 @@ targets:
     sources: [Sources/AffirmAlarmCore]
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.affirmalarm.core
+      GENERATE_INFOPLIST_FILE: YES
   AffirmAlarmCoreTests:
     type: bundle.unit-test
     platform: iOS
@@ -103,6 +104,7 @@ targets:
       - target: AffirmAlarmCore
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.affirmalarm.core.tests
+      GENERATE_INFOPLIST_FILE: YES
   AffirmAlarm:
     type: application
     platform: iOS
