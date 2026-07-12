@@ -36,6 +36,7 @@ targets:
         UILaunchScreen: {}
         NSMicrophoneUsageDescription: "AffirmAlarm needs your microphone to verify you've spoken your affirmation."
         NSSpeechRecognitionUsageDescription: "AffirmAlarm uses on-device speech recognition to verify your affirmation."
+        NSAlarmKitUsageDescription: "AffirmAlarm needs alarm access to wake you up until you speak your affirmation."
   AffirmAlarmUITests:
     type: bundle.ui-testing
     platform: iOS

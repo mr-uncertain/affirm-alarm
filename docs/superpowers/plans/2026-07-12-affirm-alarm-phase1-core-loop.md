@@ -119,6 +119,7 @@ targets:
         UILaunchScreen: {}
         NSMicrophoneUsageDescription: "AffirmAlarm needs your microphone to verify you've spoken your affirmation."
         NSSpeechRecognitionUsageDescription: "AffirmAlarm uses on-device speech recognition to verify your affirmation."
+        NSAlarmKitUsageDescription: "AffirmAlarm needs alarm access to wake you up until you speak your affirmation."
   AffirmAlarmUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -1588,6 +1589,11 @@ git tag phase1-core-loop-complete
 git push origin phase1-core-loop-complete
 ```
 Expected: tag visible at `https://github.com/mr-uncertain/affirm-alarm/tags`.
+
+**AlarmKit resolution note (added when Task 11 was executed):** researched the real AlarmKit API (WWDC25, official docs, community references — AlarmKit's exact surface isn't in this assistant's verified training data). Two real constraints emerged that the original Task 7 stub design didn't anticipate:
+1. `AlarmManager`'s real methods (`schedule`, `stop`, `requestAuthorization`) are `async throws`, but this protocol's methods are synchronous (matching how `AlarmRingViewModel`, already reviewed and tested in Task 9, calls them). Rather than cascading an async rewrite through Task 9's approved ViewModel and its 17 tests, `AlarmKitSchedulingService` bridges to the async calls via fire-and-forget `Task { }` blocks — errors from the AlarmKit side are swallowed since there is no synchronous caller to propagate them to yet (Phase 1 has no alarm-setting UI that would call `scheduleAlarm` at all).
+2. AlarmKit exposes no API for an app to control its own alert sound's volume — there is no way to honestly implement "lowers but never silences" against AlarmKit's own audio. Resolved by having `AlarmKitSchedulingService` generate and loop its own tone via `AVAudioEngine`/`AVAudioPlayerNode` (see `GeneratedTonePlayer` in `AlarmSchedulingService.swift`), which `lowerVolumeForSpeaking`/`restoreVolume` adjust directly — deterministic and testable-by-us, independent of uncertain AlarmKit runtime behavior. `scheduleAlarm`'s real AlarmKit call configures the system alarm for reliable wake-up/backgrounding; the ringtone starts on `AlarmKitSchedulingService.init()` since Phase 1's app IS the ring screen (no other screen exists yet that would signal "the alarm actually started ringing" more precisely).
+`snooze(minutes:)` does not yet re-arm a real AlarmKit alarm after the snooze interval (no alarm-setting UI exists yet to source the original configuration from) — it silences the local ringtone only. Real re-arming is deferred to the phase that adds alarm-setting.
 
 ---
 
