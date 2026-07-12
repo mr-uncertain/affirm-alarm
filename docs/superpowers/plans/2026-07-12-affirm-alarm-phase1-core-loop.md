@@ -1481,6 +1481,7 @@ struct AlarmRingView: View {
                         .fill(isHolding ? Color.yellow : Color.gray)
                         .frame(width: 120, height: 120)
                         .overlay(Text("Hold & Speak").foregroundColor(.black))
+                        .accessibilityElement(children: .ignore)
                         .accessibilityIdentifier("holdToSpeakButton")
                         .gesture(
                             DragGesture(minimumDistance: 0)
