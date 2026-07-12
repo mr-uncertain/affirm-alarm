@@ -51,13 +51,19 @@ public final class AlarmKitSchedulingService: AlarmSchedulingService {
                 let stopButton = AlarmButton(text: "Done", textColor: .white, systemImageName: "checkmark")
                 let alert = AlarmPresentation.Alert(title: "AffirmAlarm", stopButton: stopButton)
                 let presentation = AlarmPresentation(alert: alert)
-                let attributes = AlarmAttributes<AffirmAlarmMetadata>(presentation: presentation, tintColor: .orange)
+                let attributes = AlarmAttributes(presentation: presentation, metadata: AffirmAlarmMetadata(), tintColor: .orange)
 
                 let scheduleTime = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
                 let relative = Alarm.Schedule.Relative(time: scheduleTime, repeats: .never)
                 let schedule = Alarm.Schedule.relative(relative)
 
-                let configuration = AlarmManager.AlarmConfiguration(schedule: schedule, attributes: attributes)
+                let configuration = AlarmManager.AlarmConfiguration(
+                    countdownDuration: nil,
+                    schedule: schedule,
+                    attributes: attributes,
+                    secondaryIntent: nil,
+                    sound: .default
+                )
                 _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
             } catch {
                 // Best-effort: see comment above.
