@@ -5,7 +5,6 @@ import SwiftUI
 
 public enum AlarmSchedulingError: Error {
     case invalidTime
-    case noActiveAlarm
 }
 
 public protocol AlarmSchedulingService: AnyObject {

@@ -7,9 +7,11 @@ public enum RingScreenState: Equatable {
     case completed
 }
 
+@MainActor
 public final class AlarmRingViewModel: ObservableObject {
     @Published public private(set) var state: RingScreenState = .idle
     @Published public private(set) var canUseClose: Bool = true
+    @Published public private(set) var lastSpeechError: String?
 
     private let speechService: SpeechRecognitionService
     private let alarmService: AlarmSchedulingService
@@ -53,6 +55,7 @@ public final class AlarmRingViewModel: ObservableObject {
 
     public func startHolding() {
         guard case .idle = state else { return }
+        lastSpeechError = nil
         state = .listening(currentIndex: currentIndex, currentRepeat: currentRepeat)
         alarmService.lowerVolumeForSpeaking()
         listenForCurrentAffirmation()
@@ -96,10 +99,21 @@ public final class AlarmRingViewModel: ObservableObject {
         let target = affirmations[currentIndex].text
         speechService.startListening(
             onTranscriptUpdate: { [weak self] transcript in
-                self?.handleTranscript(transcript, target: target)
+                Task { @MainActor in
+                    self?.handleTranscript(transcript, target: target)
+                }
             },
-            onError: { _ in }
+            onError: { [weak self] error in
+                Task { @MainActor in
+                    self?.handleSpeechError(error)
+                }
+            }
         )
+    }
+
+    private func handleSpeechError(_ error: Error) {
+        lastSpeechError = error.localizedDescription
+        state = .idle
     }
 
     private func handleTranscript(_ transcript: String, target: String) {

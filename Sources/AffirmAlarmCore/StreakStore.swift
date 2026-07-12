@@ -48,11 +48,25 @@ public final class SwiftDataStreakStore: StreakStore {
     private let container: ModelContainer
     private let context: ModelContext
 
+    /// Phase 1 has no affirmation-authoring UI yet, so a fresh install with an
+    /// empty store would otherwise leave `listenForCurrentAffirmation()` with
+    /// nothing to listen for (see `AlarmRingViewModel.beginRing()`). At least 2
+    /// entries are required because `IntensityEngine` uses up to 2 affirmations
+    /// at once for higher streak days.
+    static let defaultAffirmations = [
+        Affirmation(text: "I am capable of starting my day", isUserAuthored: false),
+        Affirmation(text: "I choose to show up for myself today", isUserAuthored: false)
+    ]
+
     public init(inMemory: Bool = false) {
         let schema = Schema([StreakStateRecord.self, CloseUsageRecordEntity.self, AffirmationRecord.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
         container = try! ModelContainer(for: schema, configurations: [configuration])
         context = ModelContext(container)
+
+        if loadAffirmations().isEmpty {
+            save(Self.defaultAffirmations)
+        }
     }
 
     public func loadStreakState() -> StreakState {

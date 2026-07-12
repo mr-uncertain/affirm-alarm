@@ -1,5 +1,6 @@
 import Foundation
 import Speech
+import AVFoundation
 
 public protocol SpeechRecognitionService: AnyObject {
     func startListening(onTranscriptUpdate: @escaping (String) -> Void, onError: @escaping (Error) -> Void)
@@ -19,6 +20,34 @@ public final class OnDeviceSpeechRecognitionService: NSObject, SpeechRecognition
     public func startListening(onTranscriptUpdate: @escaping (String) -> Void, onError: @escaping (Error) -> Void) {
         guard let recognizer, recognizer.isAvailable else {
             onError(NSError(domain: "AffirmAlarm.Speech", code: 1, userInfo: [NSLocalizedDescriptionKey: "Speech recognizer unavailable"]))
+            return
+        }
+
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            guard let self else { return }
+            guard status == .authorized else {
+                onError(NSError(domain: "AffirmAlarm.Speech", code: 2, userInfo: [NSLocalizedDescriptionKey: "Speech recognition was not authorized"]))
+                return
+            }
+            self.beginRecognition(onTranscriptUpdate: onTranscriptUpdate, onError: onError)
+        }
+    }
+
+    private func beginRecognition(onTranscriptUpdate: @escaping (String) -> Void, onError: @escaping (Error) -> Void) {
+        guard let recognizer, recognizer.isAvailable else {
+            onError(NSError(domain: "AffirmAlarm.Speech", code: 1, userInfo: [NSLocalizedDescriptionKey: "Speech recognizer unavailable"]))
+            return
+        }
+
+        // Configure the audio session for recording. Starting a `.record`/`.playAndRecord`
+        // session is also what triggers the system microphone permission prompt on iOS —
+        // there is no separate explicit request needed alongside speech authorization.
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers])
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            onError(error)
             return
         }
 

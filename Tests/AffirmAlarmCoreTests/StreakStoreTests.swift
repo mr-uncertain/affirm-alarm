@@ -36,6 +36,13 @@ final class StreakStoreTests: XCTestCase {
         XCTAssertEqual(store.loadAffirmations(), saved)
     }
 
+    func test_freshStore_seedsDefaultAffirmations() {
+        let store = SwiftDataStreakStore(inMemory: true)
+        let affirmations = store.loadAffirmations()
+        XCTAssertGreaterThanOrEqual(affirmations.count, 2)
+        XCTAssertTrue(affirmations.allSatisfy { !$0.text.isEmpty })
+    }
+
     func test_loadAffirmations_preservesSaveOrder() {
         let store = SwiftDataStreakStore(inMemory: true)
         let saved = [

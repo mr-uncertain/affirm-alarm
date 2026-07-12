@@ -20,6 +20,11 @@ final class FakeSpeechRecognitionService: SpeechRecognitionService {
     func simulateTranscript(_ text: String) {
         onTranscriptUpdate?(text)
     }
+
+    // Test helper: simulates the speech service reporting a failure.
+    func simulateError(_ error: Error) {
+        onError?(error)
+    }
 }
 
 final class FakeAlarmSchedulingService: AlarmSchedulingService {

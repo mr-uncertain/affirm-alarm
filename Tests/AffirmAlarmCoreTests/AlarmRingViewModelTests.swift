@@ -1,6 +1,7 @@
 import XCTest
 @testable import AffirmAlarmCore
 
+@MainActor
 final class AlarmRingViewModelTests: XCTestCase {
     func makeViewModel(
         affirmations: [Affirmation] = [Affirmation(text: "I am capable", isUserAuthored: true)],
@@ -28,35 +29,39 @@ final class AlarmRingViewModelTests: XCTestCase {
         XCTAssertEqual(vm.state, .listening(currentIndex: 0, currentRepeat: 0))
     }
 
-    func test_correctTranscript_advancesRepeatCount() {
+    func test_correctTranscript_advancesRepeatCount() async {
         let (vm, speech, _, _) = makeViewModel(streakDay: 7) // day 7 = 1 affirmation x2 repeats
         vm.beginRing()
         vm.startHolding()
         speech.simulateTranscript("I am capable")
+        await Task.yield()
         XCTAssertEqual(vm.state, .listening(currentIndex: 0, currentRepeat: 1))
     }
 
-    func test_finalRepeatOfFinalAffirmation_completesSession() {
+    func test_finalRepeatOfFinalAffirmation_completesSession() async {
         let (vm, speech, _, _) = makeViewModel(streakDay: 1) // day 1 = 1 affirmation x1 repeat
         vm.beginRing()
         vm.startHolding()
         speech.simulateTranscript("I am capable")
+        await Task.yield()
         XCTAssertEqual(vm.state, .completed)
     }
 
-    func test_completingSession_stopsTheAlarm() {
+    func test_completingSession_stopsTheAlarm() async {
         let (vm, speech, alarm, _) = makeViewModel(streakDay: 1)
         vm.beginRing()
         vm.startHolding()
         speech.simulateTranscript("I am capable")
+        await Task.yield()
         XCTAssertTrue(alarm.wasCancelled)
     }
 
-    func test_completingSession_advancesStreakDayInStore() {
+    func test_completingSession_advancesStreakDayInStore() async {
         let (vm, speech, _, store) = makeViewModel(streakDay: 1)
         vm.beginRing()
         vm.startHolding()
         speech.simulateTranscript("I am capable")
+        await Task.yield()
         XCTAssertEqual(store.loadStreakState().streakDay, 2)
     }
 
@@ -70,7 +75,7 @@ final class AlarmRingViewModelTests: XCTestCase {
         XCTAssertEqual(vm.state, .listening(currentIndex: 0, currentRepeat: 0))
     }
 
-    func test_releaseHold_afterVerifyingOneAffirmation_preservesProgressOnResume() {
+    func test_releaseHold_afterVerifyingOneAffirmation_preservesProgressOnResume() async {
         let (vm, speech, _, _) = makeViewModel(
             affirmations: [
                 Affirmation(text: "I am capable", isUserAuthored: true),
@@ -81,6 +86,7 @@ final class AlarmRingViewModelTests: XCTestCase {
         vm.beginRing()
         vm.startHolding()
         speech.simulateTranscript("I am capable")
+        await Task.yield()
         XCTAssertEqual(vm.state, .listening(currentIndex: 1, currentRepeat: 0))
         vm.releaseHold()
         XCTAssertEqual(vm.state, .idle)
@@ -174,5 +180,26 @@ final class AlarmRingViewModelTests: XCTestCase {
         vm.beginRing(); vm.tapClose()
         vm.beginRing(); vm.tapClose()
         XCTAssertFalse(vm.canUseClose)
+    }
+
+    func test_speechError_duringHold_setsLastSpeechErrorAndReturnsToIdle() async {
+        let (vm, speech, _, _) = makeViewModel()
+        vm.beginRing()
+        vm.startHolding()
+        speech.simulateError(NSError(domain: "Test", code: 1, userInfo: [NSLocalizedDescriptionKey: "boom"]))
+        await Task.yield()
+        XCTAssertEqual(vm.lastSpeechError, "boom")
+        XCTAssertEqual(vm.state, .idle)
+    }
+
+    func test_startHolding_afterPriorError_clearsLastSpeechError() async {
+        let (vm, speech, _, _) = makeViewModel()
+        vm.beginRing()
+        vm.startHolding()
+        speech.simulateError(NSError(domain: "Test", code: 1, userInfo: [NSLocalizedDescriptionKey: "boom"]))
+        await Task.yield()
+        XCTAssertNotNil(vm.lastSpeechError)
+        vm.startHolding()
+        XCTAssertNil(vm.lastSpeechError)
     }
 }
