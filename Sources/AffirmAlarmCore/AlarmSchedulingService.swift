@@ -72,16 +72,20 @@ public final class AlarmKitSchedulingService: AlarmSchedulingService {
     }
 
     public func cancelAlarm() {
-        guard let id = currentAlarmID else { return }
-        currentAlarmID = nil
-        Task {
-            try? await AlarmManager.shared.stop(id: id)
+        // The local ringtone is the only audio Phase 1 ever produces (see
+        // init() above) and must stop regardless of whether a real AlarmKit
+        // alarm was ever scheduled — `currentAlarmID` only gates the
+        // AlarmKit-side stop() call, never the local ringtone.
+        if let id = currentAlarmID {
+            currentAlarmID = nil
+            Task {
+                try? await AlarmManager.shared.stop(id: id)
+            }
         }
         ringtone.stop()
     }
 
     public func snooze(minutes: Int) throws {
-        guard currentAlarmID != nil else { throw AlarmSchedulingError.noActiveAlarm }
         // AlarmKit's own post-alert snooze interval is fixed at schedule time.
         // Phase 1 has no alarm-setting UI to source a re-schedule configuration
         // from, so snoozing here just silences the local ringtone; real
@@ -97,6 +101,16 @@ public final class AlarmKitSchedulingService: AlarmSchedulingService {
     public func restoreVolume() {
         ringtone.setVolume(1.0)
     }
+
+    /// Exposed for testing: whether the local ringtone is currently playing.
+    var isRingtonePlaying: Bool {
+        ringtone.isPlaying
+    }
+
+    /// Exposed for testing: the local ringtone's current playback volume.
+    var ringtoneVolume: Float {
+        ringtone.volume
+    }
 }
 
 /// Generates and loops a simple tone locally so the app can control its
@@ -106,6 +120,7 @@ public final class AlarmKitSchedulingService: AlarmSchedulingService {
 final class GeneratedTonePlayer {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
+    private(set) var isPlaying = false
 
     init() {
         guard let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1) else { return }
@@ -119,6 +134,7 @@ final class GeneratedTonePlayer {
             try engine.start()
             player.scheduleBuffer(buffer, at: nil, options: .loops)
             player.play()
+            isPlaying = true
         } catch {
             // Best-effort: if the audio engine can't start (e.g. no audio
             // hardware in a CI simulator), the ring screen still functions —
@@ -129,10 +145,15 @@ final class GeneratedTonePlayer {
     func stop() {
         player.stop()
         engine.stop()
+        isPlaying = false
     }
 
     func setVolume(_ volume: Float) {
         player.volume = volume
+    }
+
+    var volume: Float {
+        player.volume
     }
 
     private func makeToneBuffer() -> AVAudioPCMBuffer? {
