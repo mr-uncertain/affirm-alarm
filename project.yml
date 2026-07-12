@@ -42,6 +42,9 @@ targets:
     sources: [Tests/AffirmAlarmUITests]
     dependencies:
       - target: AffirmAlarm
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.affirmalarm.app.uitests
+      GENERATE_INFOPLIST_FILE: YES
 schemes:
   AffirmAlarmCore:
     build:
