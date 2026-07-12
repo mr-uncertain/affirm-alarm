@@ -1160,6 +1160,24 @@ final class AlarmRingViewModelTests: XCTestCase {
         XCTAssertEqual(vm.state, .listening(currentIndex: 0, currentRepeat: 0))
     }
 
+    func test_releaseHold_afterVerifyingOneAffirmation_preservesProgressOnResume() {
+        let (vm, speech, _, _) = makeViewModel(
+            affirmations: [
+                Affirmation(text: "I am capable", isUserAuthored: true),
+                Affirmation(text: "I am strong", isUserAuthored: true)
+            ],
+            streakDay: 14 // 2 affirmations x1 repeat each
+        )
+        vm.beginRing()
+        vm.startHolding()
+        speech.simulateTranscript("I am capable")
+        XCTAssertEqual(vm.state, .listening(currentIndex: 1, currentRepeat: 0))
+        vm.releaseHold()
+        XCTAssertEqual(vm.state, .idle)
+        vm.startHolding()
+        XCTAssertEqual(vm.state, .listening(currentIndex: 1, currentRepeat: 0))
+    }
+
     func test_startHolding_lowersAlarmVolume() {
         let (vm, _, alarm, _) = makeViewModel()
         vm.beginRing()
@@ -1285,6 +1303,8 @@ public final class AlarmRingViewModel: ObservableObject {
     private var affirmations: [Affirmation] = []
     private var requiredCount = 1
     private var requiredRepeats = 1
+    private var currentIndex = 0
+    private var currentRepeat = 0
 
     public init(
         speechService: SpeechRecognitionService,
@@ -1308,13 +1328,15 @@ public final class AlarmRingViewModel: ObservableObject {
         let level = IntensityEngine.level(forStreakDay: streakState.streakDay)
         requiredCount = level.affirmationCount
         requiredRepeats = level.repeatsPerAffirmation
+        currentIndex = 0
+        currentRepeat = 0
         state = .idle
         canUseClose = CloseUsageTracker.canUseClose(record: store.loadCloseUsage(), now: now(), calendar: calendar)
     }
 
     public func startHolding() {
         guard case .idle = state else { return }
-        state = .listening(currentIndex: 0, currentRepeat: 0)
+        state = .listening(currentIndex: currentIndex, currentRepeat: currentRepeat)
         alarmService.lowerVolumeForSpeaking()
         listenForCurrentAffirmation()
     }
@@ -1353,8 +1375,8 @@ public final class AlarmRingViewModel: ObservableObject {
     }
 
     private func listenForCurrentAffirmation() {
-        guard case let .listening(index, _) = state, index < affirmations.count else { return }
-        let target = affirmations[index].text
+        guard currentIndex < affirmations.count else { return }
+        let target = affirmations[currentIndex].text
         speechService.startListening(
             onTranscriptUpdate: { [weak self] transcript in
                 self?.handleTranscript(transcript, target: target)
@@ -1364,20 +1386,23 @@ public final class AlarmRingViewModel: ObservableObject {
     }
 
     private func handleTranscript(_ transcript: String, target: String) {
-        guard case let .listening(index, repeatCount) = state else { return }
+        guard case .listening = state else { return }
         guard AffirmationMatcher.matches(transcript: transcript, target: target) else { return }
         speechService.stopListening()
 
-        let nextRepeat = repeatCount + 1
+        let nextRepeat = currentRepeat + 1
         if nextRepeat < requiredRepeats {
-            state = .listening(currentIndex: index, currentRepeat: nextRepeat)
+            currentRepeat = nextRepeat
+            state = .listening(currentIndex: currentIndex, currentRepeat: currentRepeat)
             listenForCurrentAffirmation()
             return
         }
 
-        let nextIndex = index + 1
+        let nextIndex = currentIndex + 1
         if nextIndex < requiredCount && nextIndex < affirmations.count {
-            state = .listening(currentIndex: nextIndex, currentRepeat: 0)
+            currentIndex = nextIndex
+            currentRepeat = 0
+            state = .listening(currentIndex: currentIndex, currentRepeat: currentRepeat)
             listenForCurrentAffirmation()
             return
         }
