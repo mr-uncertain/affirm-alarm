@@ -21,3 +21,31 @@ final class FakeSpeechRecognitionService: SpeechRecognitionService {
         onTranscriptUpdate?(text)
     }
 }
+
+final class FakeAlarmSchedulingService: AlarmSchedulingService {
+    private(set) var scheduledTime: DateComponents?
+    private(set) var wasCancelled = false
+    private(set) var snoozeCallCount = 0
+    private(set) var volumeLoweredCount = 0
+    private(set) var volumeRestoredCount = 0
+
+    func scheduleAlarm(at time: DateComponents) throws {
+        scheduledTime = time
+    }
+
+    func cancelAlarm() {
+        wasCancelled = true
+    }
+
+    func snooze(minutes: Int) throws {
+        snoozeCallCount += 1
+    }
+
+    func lowerVolumeForSpeaking() {
+        volumeLoweredCount += 1
+    }
+
+    func restoreVolume() {
+        volumeRestoredCount += 1
+    }
+}
