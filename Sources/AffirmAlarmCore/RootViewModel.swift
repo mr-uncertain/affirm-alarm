@@ -41,8 +41,16 @@ public final class RootViewModel: ObservableObject {
         // otherwise an update that arrives immediately after start() would
         // race an unstructured Task that hasn't begun running yet and be
         // silently dropped.
+        //
+        // The consuming Task is pinned to @MainActor explicitly (matching
+        // AlarmRingViewModel's speechService callback-bridging pattern)
+        // rather than relying on isolation being inferred from this
+        // MainActor method: without it, this Task can start running on a
+        // different executor, so a single `await Task.yield()` in a
+        // @MainActor test isn't guaranteed to give it a turn before the
+        // test's assertions run.
         let updates = alarmService.alertingAlarmUpdates()
-        updatesTask = Task { [weak self] in
+        updatesTask = Task { @MainActor [weak self] in
             guard let self else { return }
             for await alertingID in updates {
                 await self.handleUpdate(alertingID: alertingID)
