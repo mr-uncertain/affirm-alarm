@@ -8,11 +8,14 @@ public enum AlarmSchedulingError: Error {
 }
 
 public protocol AlarmSchedulingService: AnyObject {
-    func scheduleAlarm(at time: DateComponents) throws
+    func scheduleAlarm(at time: DateComponents) async throws
     func cancelAlarm()
     func snooze(minutes: Int) throws
     func lowerVolumeForSpeaking()
     func restoreVolume()
+    func syncActiveAlarm(id: UUID)
+    func currentlyAlertingAlarmID() async -> UUID?
+    func alertingAlarmUpdates() -> AsyncStream<UUID?>
 }
 
 struct AffirmAlarmMetadata: AlarmMetadata {}
@@ -31,49 +34,49 @@ public final class AlarmKitSchedulingService: AlarmSchedulingService {
         ringtone.start()
     }
 
-    public func scheduleAlarm(at time: DateComponents) throws {
+    public func scheduleAlarm(at time: DateComponents) async throws {
         guard let hour = time.hour, let minute = time.minute else {
             throw AlarmSchedulingError.invalidTime
         }
         let id = UUID()
+
+        _ = try await AlarmManager.shared.requestAuthorization()
+
+        // The system now always provides its own Stop button automatically —
+        // AlarmPresentation.Alert's `stopButton:` parameter was deprecated in
+        // iOS 26.1 and has been removed here. `secondaryButton` +
+        // `.custom` is what lets the fired alert's "Open" action launch the
+        // app into AlarmRingView; see the Phase 2 design spec's accepted
+        // trade-off note on why the system Stop button itself can't be
+        // gated or intercepted.
+        let openButton = AlarmButton(text: "Open", textColor: .white, systemImageName: "arrow.up.forward.app")
+        let alert = AlarmPresentation.Alert(
+            title: "AffirmAlarm",
+            secondaryButton: openButton,
+            secondaryButtonBehavior: .custom
+        )
+        let presentation = AlarmPresentation(alert: alert)
+        let attributes = AlarmAttributes(presentation: presentation, metadata: AffirmAlarmMetadata(), tintColor: .orange)
+
+        let scheduleTime = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
+        let relative = Alarm.Schedule.Relative(time: scheduleTime, repeats: .never)
+        let schedule = Alarm.Schedule.relative(relative)
+
+        let configuration = AlarmManager.AlarmConfiguration(
+            countdownDuration: nil,
+            schedule: schedule,
+            attributes: attributes,
+            secondaryIntent: nil,
+            sound: .default
+        )
+        _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
         currentAlarmID = id
-
-        // AlarmManager's real API is async; this protocol's callers (see
-        // AlarmRingViewModel) are synchronous and Phase 1 has no alarm-setting
-        // UI yet to synchronously await a result, so scheduling is bridged as
-        // fire-and-forget. Errors are swallowed here deliberately — there is no
-        // synchronous caller to propagate them to yet.
-        Task {
-            do {
-                _ = try await AlarmManager.shared.requestAuthorization()
-
-                let stopButton = AlarmButton(text: "Done", textColor: .white, systemImageName: "checkmark")
-                let alert = AlarmPresentation.Alert(title: "AffirmAlarm", stopButton: stopButton)
-                let presentation = AlarmPresentation(alert: alert)
-                let attributes = AlarmAttributes(presentation: presentation, metadata: AffirmAlarmMetadata(), tintColor: .orange)
-
-                let scheduleTime = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
-                let relative = Alarm.Schedule.Relative(time: scheduleTime, repeats: .never)
-                let schedule = Alarm.Schedule.relative(relative)
-
-                let configuration = AlarmManager.AlarmConfiguration(
-                    countdownDuration: nil,
-                    schedule: schedule,
-                    attributes: attributes,
-                    secondaryIntent: nil,
-                    sound: .default
-                )
-                _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
-            } catch {
-                // Best-effort: see comment above.
-            }
-        }
     }
 
     public func cancelAlarm() {
-        // The local ringtone is the only audio Phase 1 ever produces (see
-        // init() above) and must stop regardless of whether a real AlarmKit
-        // alarm was ever scheduled — `currentAlarmID` only gates the
+        // The local ringtone is the only audio Phase 1/2 ever produces (see
+        // init() above) and must stop regardless of whether this instance
+        // knows the AlarmKit-side id — currentAlarmID only gates the
         // AlarmKit-side stop() call, never the local ringtone.
         if let id = currentAlarmID {
             currentAlarmID = nil
@@ -85,11 +88,10 @@ public final class AlarmKitSchedulingService: AlarmSchedulingService {
     }
 
     public func snooze(minutes: Int) throws {
-        // AlarmKit's own post-alert snooze interval is fixed at schedule time.
-        // Phase 1 has no alarm-setting UI to source a re-schedule configuration
-        // from, so snoozing here just silences the local ringtone; real
-        // re-arming after `minutes` is deferred to the phase that adds
-        // alarm-setting.
+        // AlarmKit's own post-alert snooze interval is fixed at schedule time
+        // and real OS-level snooze requires a Widget Extension (deferred,
+        // see Phase 2 design spec). Snoozing here silences the local
+        // ringtone only.
         ringtone.stop()
     }
 
@@ -99,6 +101,34 @@ public final class AlarmKitSchedulingService: AlarmSchedulingService {
 
     public func restoreVolume() {
         ringtone.setVolume(1.0)
+    }
+
+    /// Called by the routing layer (RootViewModel, Task 2) once it discovers
+    /// a real alerting alarm's id from AlarmManager on a fresh app launch —
+    /// this instance is reconstructed each launch (see AffirmAlarmApp), so
+    /// currentAlarmID from a prior session's scheduleAlarm() call is
+    /// otherwise lost, leaving cancelAlarm()'s AlarmManager.stop(id:) call
+    /// unreachable on the exact launch that matters most.
+    public func syncActiveAlarm(id: UUID) {
+        currentAlarmID = id
+    }
+
+    public func currentlyAlertingAlarmID() async -> UUID? {
+        guard let alarms = try? AlarmManager.shared.alarms else { return nil }
+        return alarms.first(where: { $0.state == .alerting })?.id
+    }
+
+    public func alertingAlarmUpdates() -> AsyncStream<UUID?> {
+        AsyncStream { continuation in
+            let task = Task {
+                for await alarms in AlarmManager.shared.alarmUpdates {
+                    let alertingID = alarms.first(where: { $0.state == .alerting })?.id
+                    continuation.yield(alertingID)
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 
     /// Exposed for testing: whether the local ringtone is currently playing.

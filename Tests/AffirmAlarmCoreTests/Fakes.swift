@@ -33,8 +33,13 @@ final class FakeAlarmSchedulingService: AlarmSchedulingService {
     private(set) var snoozeCallCount = 0
     private(set) var volumeLoweredCount = 0
     private(set) var volumeRestoredCount = 0
+    private(set) var syncedAlarmID: UUID?
+    var alertingIDToReturn: UUID?
+    var scheduleAlarmError: Error?
+    private var updatesContinuation: AsyncStream<UUID?>.Continuation?
 
-    func scheduleAlarm(at time: DateComponents) throws {
+    func scheduleAlarm(at time: DateComponents) async throws {
+        if let scheduleAlarmError { throw scheduleAlarmError }
         scheduledTime = time
     }
 
@@ -52,5 +57,24 @@ final class FakeAlarmSchedulingService: AlarmSchedulingService {
 
     func restoreVolume() {
         volumeRestoredCount += 1
+    }
+
+    func syncActiveAlarm(id: UUID) {
+        syncedAlarmID = id
+    }
+
+    func currentlyAlertingAlarmID() async -> UUID? {
+        alertingIDToReturn
+    }
+
+    func alertingAlarmUpdates() -> AsyncStream<UUID?> {
+        AsyncStream { continuation in
+            self.updatesContinuation = continuation
+        }
+    }
+
+    // Test helper: drives the alertingAlarmUpdates() stream.
+    func simulateAlertingUpdate(_ id: UUID?) {
+        updatesContinuation?.yield(id)
     }
 }

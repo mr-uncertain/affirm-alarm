@@ -2,7 +2,7 @@ name: AffirmAlarm
 options:
   bundleIdPrefix: com.affirmalarm
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "26.1"
 settings:
   SWIFT_VERSION: "5.0"
 targets:
