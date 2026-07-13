@@ -21,4 +21,10 @@ final class AlarmRingUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.otherElements["holdToSpeakButton"].waitForExistence(timeout: 5))
     }
+
+    func test_homeScreen_isVisibleOnNormalLaunch() {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.datePickers["alarmTimePicker"].waitForExistence(timeout: 5))
+    }
 }
