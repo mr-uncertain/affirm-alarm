@@ -53,4 +53,38 @@ final class StreakStoreTests: XCTestCase {
         store.save(saved)
         XCTAssertEqual(store.loadAffirmations(), saved)
     }
+
+    func test_loadConsentState_defaultsToNotDecidedWhenEmpty() {
+        let store = SwiftDataStreakStore(inMemory: true)
+        let consent = store.loadConsentState()
+        XCTAssertFalse(consent.hasOptedIn)
+        XCTAssertNil(consent.decidedAt)
+    }
+
+    func test_saveThenLoad_roundTripsConsentState() {
+        let store = SwiftDataStreakStore(inMemory: true)
+        let saved = ConsentState(hasOptedIn: true, decidedAt: Date(timeIntervalSince1970: 2_000_000))
+        store.save(saved)
+        XCTAssertEqual(store.loadConsentState(), saved)
+    }
+
+    func test_appendChatMessage_thenLoadChatHistory_roundTripsInTimestampOrder() {
+        let store = SwiftDataStreakStore(inMemory: true)
+        let first = ChatMessage(role: .user, text: "hi", timestamp: Date(timeIntervalSince1970: 1), sessionType: .onboarding)
+        let second = ChatMessage(role: .assistant, text: "hello", timestamp: Date(timeIntervalSince1970: 2), sessionType: .onboarding)
+        store.appendChatMessage(second)
+        store.appendChatMessage(first)
+
+        XCTAssertEqual(store.loadChatHistory(), [first, second])
+    }
+
+    func test_recordGenerationEvent_thenLoadGenerationEvents_roundTripsNewestFirst() {
+        let store = SwiftDataStreakStore(inMemory: true)
+        let older = AffirmationGenerationEvent(date: Date(timeIntervalSince1970: 1), sessionType: .onboarding, generatedTexts: ["a"])
+        let newer = AffirmationGenerationEvent(date: Date(timeIntervalSince1970: 2), sessionType: .checkIn, generatedTexts: ["b", "c"])
+        store.recordGenerationEvent(older)
+        store.recordGenerationEvent(newer)
+
+        XCTAssertEqual(store.loadGenerationEvents(), [newer, older])
+    }
 }

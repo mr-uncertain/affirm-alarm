@@ -35,6 +35,46 @@ final class AffirmationRecord {
     }
 }
 
+@Model
+final class ChatMessageRecord {
+    var id: UUID
+    var role: ChatRole
+    var text: String
+    var timestamp: Date
+    var sessionType: ChatSessionType
+    init(id: UUID, role: ChatRole, text: String, timestamp: Date, sessionType: ChatSessionType) {
+        self.id = id
+        self.role = role
+        self.text = text
+        self.timestamp = timestamp
+        self.sessionType = sessionType
+    }
+}
+
+@Model
+final class AffirmationGenerationEventRecord {
+    var id: UUID
+    var date: Date
+    var sessionType: ChatSessionType
+    var generatedTexts: [String]
+    init(id: UUID, date: Date, sessionType: ChatSessionType, generatedTexts: [String]) {
+        self.id = id
+        self.date = date
+        self.sessionType = sessionType
+        self.generatedTexts = generatedTexts
+    }
+}
+
+@Model
+final class ConsentStateRecord {
+    var hasOptedIn: Bool
+    var decidedAt: Date?
+    init(hasOptedIn: Bool, decidedAt: Date?) {
+        self.hasOptedIn = hasOptedIn
+        self.decidedAt = decidedAt
+    }
+}
+
 public protocol StreakStore {
     func loadStreakState() -> StreakState
     func save(_ state: StreakState)
@@ -42,6 +82,12 @@ public protocol StreakStore {
     func save(_ usage: CloseUsageRecord)
     func loadAffirmations() -> [Affirmation]
     func save(_ affirmations: [Affirmation])
+    func loadConsentState() -> ConsentState
+    func save(_ consent: ConsentState)
+    func appendChatMessage(_ message: ChatMessage)
+    func loadChatHistory() -> [ChatMessage]
+    func recordGenerationEvent(_ event: AffirmationGenerationEvent)
+    func loadGenerationEvents() -> [AffirmationGenerationEvent]
 }
 
 public final class SwiftDataStreakStore: StreakStore {
@@ -59,7 +105,14 @@ public final class SwiftDataStreakStore: StreakStore {
     ]
 
     public init(inMemory: Bool = false) {
-        let schema = Schema([StreakStateRecord.self, CloseUsageRecordEntity.self, AffirmationRecord.self])
+        let schema = Schema([
+            StreakStateRecord.self,
+            CloseUsageRecordEntity.self,
+            AffirmationRecord.self,
+            ChatMessageRecord.self,
+            AffirmationGenerationEventRecord.self,
+            ConsentStateRecord.self
+        ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
         container = try! ModelContainer(for: schema, configurations: [configuration])
         context = ModelContext(container)
@@ -108,5 +161,40 @@ public final class SwiftDataStreakStore: StreakStore {
             context.insert(AffirmationRecord(id: a.id, text: a.text, isUserAuthored: a.isUserAuthored, sortOrder: index))
         }
         try? context.save()
+    }
+
+    public func loadConsentState() -> ConsentState {
+        let records = try? context.fetch(FetchDescriptor<ConsentStateRecord>())
+        guard let record = records?.first else { return ConsentState(hasOptedIn: false, decidedAt: nil) }
+        return ConsentState(hasOptedIn: record.hasOptedIn, decidedAt: record.decidedAt)
+    }
+
+    public func save(_ consent: ConsentState) {
+        let existing = try? context.fetch(FetchDescriptor<ConsentStateRecord>())
+        existing?.forEach { context.delete($0) }
+        context.insert(ConsentStateRecord(hasOptedIn: consent.hasOptedIn, decidedAt: consent.decidedAt))
+        try? context.save()
+    }
+
+    public func appendChatMessage(_ message: ChatMessage) {
+        context.insert(ChatMessageRecord(id: message.id, role: message.role, text: message.text, timestamp: message.timestamp, sessionType: message.sessionType))
+        try? context.save()
+    }
+
+    public func loadChatHistory() -> [ChatMessage] {
+        let descriptor = FetchDescriptor<ChatMessageRecord>(sortBy: [SortDescriptor(\.timestamp)])
+        let records = (try? context.fetch(descriptor)) ?? []
+        return records.map { ChatMessage(id: $0.id, role: $0.role, text: $0.text, timestamp: $0.timestamp, sessionType: $0.sessionType) }
+    }
+
+    public func recordGenerationEvent(_ event: AffirmationGenerationEvent) {
+        context.insert(AffirmationGenerationEventRecord(id: event.id, date: event.date, sessionType: event.sessionType, generatedTexts: event.generatedTexts))
+        try? context.save()
+    }
+
+    public func loadGenerationEvents() -> [AffirmationGenerationEvent] {
+        let descriptor = FetchDescriptor<AffirmationGenerationEventRecord>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+        let records = (try? context.fetch(descriptor)) ?? []
+        return records.map { AffirmationGenerationEvent(id: $0.id, date: $0.date, sessionType: $0.sessionType, generatedTexts: $0.generatedTexts) }
     }
 }
