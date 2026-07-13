@@ -40,6 +40,13 @@ struct HomeView: View {
                     Text("Day \(viewModel.streakDay)")
                         .accessibilityIdentifier("streakDayLabel")
                 }
+
+                Section {
+                    NavigationLink("Edit affirmations") {
+                        AffirmationEditView(viewModel: AffirmationEditViewModel(store: viewModel.store))
+                    }
+                    .accessibilityIdentifier("editAffirmationsLink")
+                }
             }
             .navigationTitle("AffirmAlarm")
         }

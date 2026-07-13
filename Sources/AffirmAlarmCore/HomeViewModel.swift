@@ -8,7 +8,7 @@ public final class HomeViewModel: ObservableObject {
     @Published public private(set) var streakDay: Int
 
     private let alarmService: AlarmSchedulingService
-    private let store: StreakStore
+    public let store: StreakStore
 
     public init(alarmService: AlarmSchedulingService, store: StreakStore) {
         self.alarmService = alarmService
