@@ -78,3 +78,25 @@ final class FakeAlarmSchedulingService: AlarmSchedulingService {
         updatesContinuation?.yield(id)
     }
 }
+
+final class FakeAIContentService: AIContentService {
+    var availabilityToReturn = true
+    var sendMessageResult: Result<String, Error> = .success("Thanks for sharing.")
+    var generateAffirmationsResult: Result<[String], Error> = .success(["I am capable"])
+    private(set) var sentMessages: [String] = []
+    private(set) var generateCallCount = 0
+
+    func isAvailable() async -> Bool {
+        availabilityToReturn
+    }
+
+    func sendMessage(_ message: String, history: [ChatMessage]) async throws -> String {
+        sentMessages.append(message)
+        return try sendMessageResult.get()
+    }
+
+    func generateAffirmations(from history: [ChatMessage]) async throws -> [String] {
+        generateCallCount += 1
+        return try generateAffirmationsResult.get()
+    }
+}
