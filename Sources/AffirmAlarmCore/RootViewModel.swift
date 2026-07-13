@@ -34,9 +34,17 @@ public final class RootViewModel: ObservableObject {
 
     private func observeUpdates() {
         updatesTask?.cancel()
+        // Obtain the stream synchronously, here on the caller's turn, rather
+        // than inside the Task below: alertingAlarmUpdates() is what
+        // registers the subscription (the AsyncStream's continuation), and
+        // that registration must be in place before start() returns —
+        // otherwise an update that arrives immediately after start() would
+        // race an unstructured Task that hasn't begun running yet and be
+        // silently dropped.
+        let updates = alarmService.alertingAlarmUpdates()
         updatesTask = Task { [weak self] in
             guard let self else { return }
-            for await alertingID in alarmService.alertingAlarmUpdates() {
+            for await alertingID in updates {
                 await self.handleUpdate(alertingID: alertingID)
             }
         }
