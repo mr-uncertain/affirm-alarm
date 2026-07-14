@@ -84,9 +84,33 @@ final class ChatViewModelTests: XCTestCase {
 
         await viewModel.send("hello")
 
-        guard case .error = viewModel.turnState else {
+        guard case .error(let message) = viewModel.turnState else {
             return XCTFail("expected .error turnState")
         }
+        XCTAssertEqual(message, "Something went wrong generating a response. Please try again.")
+    }
+
+    func test_send_retryAfterFailure_doesNotDuplicateUserMessageOrPersistedRow() async {
+        let store = SwiftDataStreakStore(inMemory: true)
+        let ai = FakeAIContentService()
+        ai.sendMessageResult = .failure(AIContentError.generationFailed)
+        let viewModel = makeViewModel(ai: ai, store: store)
+        viewModel.recordConsent(optedIn: true)
+
+        await viewModel.send("hello")
+
+        XCTAssertEqual(viewModel.messages.map(\.text), ["hello"])
+        XCTAssertEqual(store.loadChatHistory().count, 1)
+        guard case .error = viewModel.turnState else {
+            return XCTFail("expected .error turnState after failed send")
+        }
+
+        ai.sendMessageResult = .success("Good to hear.")
+        await viewModel.send("hello")
+
+        XCTAssertEqual(viewModel.messages.map(\.text), ["hello", "Good to hear."])
+        XCTAssertEqual(store.loadChatHistory().count, 2)
+        XCTAssertEqual(viewModel.turnState, .idle)
     }
 
     func test_generateAffirmations_success_setsGeneratedAffirmationsAndPersistsEventWhenOptedIn() async {
@@ -112,9 +136,10 @@ final class ChatViewModelTests: XCTestCase {
 
         await viewModel.generateAffirmations()
 
-        guard case .error = viewModel.turnState else {
+        guard case .error(let message) = viewModel.turnState else {
             return XCTFail("expected .error turnState")
         }
+        XCTAssertEqual(message, "Something went wrong generating a response. Please try again.")
         XCTAssertNil(viewModel.generatedAffirmations)
     }
 

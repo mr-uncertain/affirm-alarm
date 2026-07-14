@@ -50,9 +50,16 @@ public final class ChatViewModel: ObservableObject {
     }
 
     public func send(_ text: String) async {
-        let userMessage = ChatMessage(role: .user, text: text, timestamp: now(), sessionType: sessionType)
-        messages.append(userMessage)
-        persistIfConsented(userMessage)
+        // If the trailing message is an unanswered user message with this same text, this is a
+        // retry of a previously failed send (see ChatView's Retry button, which re-calls send(_:)
+        // with the same text). Reuse the already-appended, already-persisted message instead of
+        // creating a duplicate.
+        let isRetryOfUnansweredMessage = messages.last?.role == .user && messages.last?.text == text
+        if !isRetryOfUnansweredMessage {
+            let userMessage = ChatMessage(role: .user, text: text, timestamp: now(), sessionType: sessionType)
+            messages.append(userMessage)
+            persistIfConsented(userMessage)
+        }
         turnState = .sending
         do {
             let reply = try await aiService.sendMessage(text, history: messages)
