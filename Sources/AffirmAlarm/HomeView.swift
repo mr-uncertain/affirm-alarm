@@ -49,6 +49,11 @@ struct HomeView: View {
                         AffirmationEditView(viewModel: AffirmationEditViewModel(store: viewModel.store))
                     }
                     .accessibilityIdentifier("editAffirmationsLink")
+
+                    NavigationLink("Insights") {
+                        InsightsView(viewModel: InsightsViewModel(store: viewModel.store))
+                    }
+                    .accessibilityIdentifier("insightsLink")
                 }
 
                 Section {
