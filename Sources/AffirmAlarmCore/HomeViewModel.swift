@@ -9,11 +9,22 @@ public final class HomeViewModel: ObservableObject {
 
     private let alarmService: AlarmSchedulingService
     public let store: StreakStore
+    public let aiService: AIContentService
 
-    public init(alarmService: AlarmSchedulingService, store: StreakStore) {
+    public enum ChatEntryDestination: Equatable {
+        case chat
+        case editAffirmationsDirectly
+    }
+
+    public init(alarmService: AlarmSchedulingService, store: StreakStore, aiService: AIContentService) {
         self.alarmService = alarmService
         self.store = store
+        self.aiService = aiService
         self.streakDay = store.loadStreakState().streakDay
+    }
+
+    public func resolveChatEntry() async -> ChatEntryDestination {
+        await aiService.isAvailable() ? .chat : .editAffirmationsDirectly
     }
 
     public func saveAlarmTime() async {

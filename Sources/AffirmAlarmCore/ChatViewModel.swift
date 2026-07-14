@@ -75,6 +75,10 @@ public final class ChatViewModel: ObservableObject {
         }
     }
 
+    public func continueWithoutAI() {
+        generatedAffirmations = []
+    }
+
     private func loadHistoryIfConsented(_ consent: ConsentState) {
         guard consent.hasOptedIn else { return }
         messages = store.loadChatHistory()

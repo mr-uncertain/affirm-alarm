@@ -3,6 +3,9 @@ import AffirmAlarmCore
 
 struct HomeView: View {
     @ObservedObject var viewModel: HomeViewModel
+    @State private var chatDestination: HomeViewModel.ChatEntryDestination?
+    @State private var showChat = false
+    @State private var showManualEditDirectly = false
 
     var body: some View {
         NavigationStack {
@@ -46,6 +49,29 @@ struct HomeView: View {
                         AffirmationEditView(viewModel: AffirmationEditViewModel(store: viewModel.store))
                     }
                     .accessibilityIdentifier("editAffirmationsLink")
+                }
+
+                Section {
+                    Button("Chat with AI") {
+                        Task {
+                            switch await viewModel.resolveChatEntry() {
+                            case .chat:
+                                showChat = true
+                            case .editAffirmationsDirectly:
+                                showManualEditDirectly = true
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("chatWithAIButton")
+                }
+                .navigationDestination(isPresented: $showChat) {
+                    ChatView(
+                        viewModel: ChatViewModel(aiService: viewModel.aiService, store: viewModel.store, sessionType: .onboarding),
+                        store: viewModel.store
+                    )
+                }
+                .navigationDestination(isPresented: $showManualEditDirectly) {
+                    AffirmationEditView(viewModel: AffirmationEditViewModel(store: viewModel.store))
                 }
             }
             .navigationTitle("AffirmAlarm")
