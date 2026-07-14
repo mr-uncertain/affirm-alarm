@@ -4,6 +4,7 @@ import UserNotifications
 public protocol NotificationScheduling {
     func addRequest(_ request: UNNotificationRequest)
     func removePendingRequests(withIdentifiers identifiers: [String])
+    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
 }
 
 extension UNUserNotificationCenter: NotificationScheduling {
@@ -35,7 +36,7 @@ public final class LocalNotificationCheckInScheduler: CheckInScheduling {
 
     public func scheduleNextCheckIn(from date: Date) async {
         cancelPendingCheckIns()
-        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        _ = try? await center.requestAuthorization(options: [.alert, .sound])
 
         let checkInContent = UNMutableNotificationContent()
         checkInContent.title = "Time for a check-in"

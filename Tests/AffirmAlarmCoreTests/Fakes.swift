@@ -115,6 +115,10 @@ final class FakeNotificationScheduling: NotificationScheduling {
         lastRemovedIdentifiers = identifiers
         removeCallCount += 1
     }
+
+    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
+        true
+    }
 }
 
 final class FakeCheckInScheduling: CheckInScheduling {
