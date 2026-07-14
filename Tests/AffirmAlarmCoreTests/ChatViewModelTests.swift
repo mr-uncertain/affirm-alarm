@@ -93,13 +93,15 @@ final class ChatViewModelTests: XCTestCase {
         let store = SwiftDataStreakStore(inMemory: true)
         let ai = FakeAIContentService()
         ai.generateAffirmationsResult = .success(["I am capable", "I am calm"])
-        let viewModel = makeViewModel(ai: ai, store: store)
+        let checkInScheduler = FakeCheckInScheduling()
+        let viewModel = makeViewModel(ai: ai, store: store, checkInScheduler: checkInScheduler)
         viewModel.recordConsent(optedIn: true)
 
         await viewModel.generateAffirmations()
 
         XCTAssertEqual(viewModel.generatedAffirmations, ["I am capable", "I am calm"])
         XCTAssertEqual(store.loadGenerationEvents().first?.generatedTexts, ["I am capable", "I am calm"])
+        XCTAssertEqual(checkInScheduler.scheduleCallCount, 1)
     }
 
     func test_generateAffirmations_failure_setsErrorState() async {
@@ -119,8 +121,9 @@ final class ChatViewModelTests: XCTestCase {
     private func makeViewModel(
         ai: FakeAIContentService = FakeAIContentService(),
         store: StreakStore = SwiftDataStreakStore(inMemory: true),
-        sessionType: ChatSessionType = .onboarding
+        sessionType: ChatSessionType = .onboarding,
+        checkInScheduler: CheckInScheduling = FakeCheckInScheduling()
     ) -> ChatViewModel {
-        ChatViewModel(aiService: ai, store: store, sessionType: sessionType)
+        ChatViewModel(aiService: ai, store: store, sessionType: sessionType, checkInScheduler: checkInScheduler)
     }
 }

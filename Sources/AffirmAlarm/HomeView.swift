@@ -66,7 +66,12 @@ struct HomeView: View {
                 }
                 .navigationDestination(isPresented: $showChat) {
                     ChatView(
-                        viewModel: ChatViewModel(aiService: viewModel.aiService, store: viewModel.store, sessionType: .onboarding),
+                        viewModel: ChatViewModel(
+                            aiService: viewModel.aiService,
+                            store: viewModel.store,
+                            sessionType: .onboarding,
+                            checkInScheduler: LocalNotificationCheckInScheduler()
+                        ),
                         store: viewModel.store
                     )
                 }

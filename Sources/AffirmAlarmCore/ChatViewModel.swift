@@ -17,17 +17,20 @@ public final class ChatViewModel: ObservableObject {
     private let aiService: AIContentService
     private let store: StreakStore
     private let sessionType: ChatSessionType
+    private let checkInScheduler: CheckInScheduling
     private let now: () -> Date
 
     public init(
         aiService: AIContentService,
         store: StreakStore,
         sessionType: ChatSessionType,
+        checkInScheduler: CheckInScheduling,
         now: @escaping () -> Date = Date.init
     ) {
         self.aiService = aiService
         self.store = store
         self.sessionType = sessionType
+        self.checkInScheduler = checkInScheduler
         self.now = now
     }
 
@@ -69,6 +72,7 @@ public final class ChatViewModel: ObservableObject {
             let texts = try await aiService.generateAffirmations(from: messages)
             generatedAffirmations = texts
             persistGenerationEventIfConsented(texts)
+            await checkInScheduler.scheduleNextCheckIn(from: now())
             turnState = .idle
         } catch {
             turnState = .error(error.localizedDescription)
