@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 @testable import AffirmAlarmCore
 
 final class FakeSpeechRecognitionService: SpeechRecognitionService {
@@ -98,5 +99,33 @@ final class FakeAIContentService: AIContentService {
     func generateAffirmations(from history: [ChatMessage]) async throws -> [String] {
         generateCallCount += 1
         return try generateAffirmationsResult.get()
+    }
+}
+
+final class FakeNotificationScheduling: NotificationScheduling {
+    private(set) var addedIdentifiers: [String] = []
+    private(set) var lastRemovedIdentifiers: [String] = []
+    private(set) var removeCallCount = 0
+
+    func addRequest(_ request: UNNotificationRequest) {
+        addedIdentifiers.append(request.identifier)
+    }
+
+    func removePendingRequests(withIdentifiers identifiers: [String]) {
+        lastRemovedIdentifiers = identifiers
+        removeCallCount += 1
+    }
+}
+
+final class FakeCheckInScheduling: CheckInScheduling {
+    private(set) var scheduleCallCount = 0
+    private(set) var cancelCallCount = 0
+
+    func scheduleNextCheckIn(from date: Date) async {
+        scheduleCallCount += 1
+    }
+
+    func cancelPendingCheckIns() {
+        cancelCallCount += 1
     }
 }
