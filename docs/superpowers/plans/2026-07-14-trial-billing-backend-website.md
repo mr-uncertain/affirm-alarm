@@ -276,24 +276,19 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npx prisma generate
-      - run: npx prisma migrate deploy
+      - run: npx prisma db push
       - run: npm run lint
       - run: npm run build
       - run: npm test
 ```
 
-- [ ] **Step 6: Create the initial migration locally (schema-only, no live DB needed for this command)**
+Uses `prisma db push`, not `prisma migrate dev`/`migrate deploy` — this project keeps no `prisma/migrations` directory. `migrate dev` (even with `--create-only`) needs to connect to a live database to diff against, which does not exist in this sandbox; `db push` syncs `schema.prisma` directly to whatever `DATABASE_URL` is live at run time, which is exactly what CI's Postgres service container provides, with no local generation step required. If a real migration history is wanted later (e.g. once this ships to production against Neon), that's a deliberate follow-up decision, not something to introduce speculatively here.
 
-```bash
-npx prisma migrate dev --name init --create-only
-```
-This writes `prisma/migrations/<timestamp>_init/migration.sql` from the schema diff without needing a reachable database (`--create-only` skips applying it). Inspect the generated SQL file to confirm it creates the `User` table and `SubscriptionStatus` enum as expected.
-
-- [ ] **Step 7: Update `.env.example`**
+- [ ] **Step 6: Update `.env.example`**
 
 `.env.example` already lists `DATABASE_URL` from Task 1 — no change needed; confirm it's still there.
 
-- [ ] **Step 8: Commit and push**
+- [ ] **Step 7: Commit and push**
 
 ```bash
 git add prisma lib/db.ts lib/config.ts .github/workflows/ci.yml
@@ -301,13 +296,13 @@ git commit -m "feat: add Prisma schema, DB client, and shared config; wire Postg
 git push
 ```
 
-- [ ] **Step 9: Verify CI is green**
+- [ ] **Step 8: Verify CI is green**
 
 ```bash
 export GIT_CONFIG_NOSYSTEM=1
 gh run watch
 ```
-Expected: `prisma migrate deploy` applies the migration against the service container, all subsequent steps pass.
+Expected: `prisma db push` syncs the schema against the service container, all subsequent steps pass.
 
 ---
 
@@ -2386,10 +2381,7 @@ Modify `prisma/schema.prisma`, add one field to `User`:
   cancelAtPeriodEnd     Boolean             @default(false)
 ```
 
-Run:
-```bash
-npx prisma migrate dev --name add_cancel_at_period_end --create-only
-```
+No local migration-generation command needed — Task 2 established `prisma db push` as this project's schema-sync approach; CI applies the updated schema automatically when this task's `npm test` job runs `npx prisma db push` against the service container.
 
 Modify `lib/userRepository.ts` — add to the `UserRepository` interface:
 ```ts
@@ -2763,11 +2755,18 @@ billing/ownership access:
 | `RAZORPAY_KEY_SECRET` | Razorpay API key secret |
 | `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook signing secret |
 
-## Running migrations against a real database
+## Syncing the schema against a real database
+
+This project uses `prisma db push` rather than migration files (see Task 2 of
+the implementation plan for why — this sandbox had no live database available
+during development to generate migrations against). Before switching to a
+real migration history for production, run:
 
 \`\`\`bash
-npx prisma migrate deploy
+npx prisma db push
 \`\`\`
+
+against your Neon `DATABASE_URL`.
 
 ## What's intentionally out of scope here
 
